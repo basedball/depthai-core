@@ -325,6 +325,7 @@ endif()
 option(DEPTHAI_BUILD_TESTS "Build tests" OFF)
 option(DEPTHAI_BUILD_EXAMPLES "Build examples - Requires OpenCV library to be installed" OFF)
 option(DEPTHAI_BUILD_DOCS "Build documentation - requires doxygen to be installed" OFF)
+option(DEPTHAI_OPENCV_SUPPORT "Enable optional OpenCV support" ON)
 option(DEPTHAI_PCL_SUPPORT "Enable optional PCL support" OFF)
 
 
@@ -545,38 +546,54 @@ add_runtime_dependencies(${TARGET_CORE_NAME} usb-1.0)
 set(THIRDPARTY_OPENCV_LIBRARIES "" CACHE STRING "Optional libraries to link OpenCV support, e.g. TBB::tbb")
 set(TARGET_OPENCV_NAME ${PROJECT_NAME}-opencv)
 set(TARGET_OPENCV_ALIAS opencv)
+if(DEPTHAI_OPENCV_SUPPORT)
+    # Check if required libraries are available
+    set(REQUIRED_OPENCV_LIBRARIES "opencv_core" "opencv_imgproc")
+    set(OPENCV_SUPPORT_AVAILABLE ${OpenCV_FOUND})
+    foreach(lib ${REQUIRED_OPENCV_LIBRARIES})
+        if(NOT (lib IN_LIST OpenCV_LIBS))
+            set(OPENCV_SUPPORT_AVAILABLE FALSE)
+        endif()
+    endforeach()
 
-# Add depthai-core-opencv library and depthai::core::opencv alias
-add_library(${TARGET_OPENCV_NAME} src/opencv/ImgFrame.cpp)
-add_library("${PROJECT_NAME}::${TARGET_OPENCV_ALIAS}" ALIAS ${TARGET_OPENCV_NAME})
-# Specifies name of generated IMPORTED target (set to alias)
-set_target_properties(${TARGET_OPENCV_NAME} PROPERTIES EXPORT_NAME ${TARGET_OPENCV_ALIAS})
+    if(OPENCV_SUPPORT_AVAILABLE)
 
-# Add default flags
-add_default_flags(${TARGET_OPENCV_NAME})
-add_flag(${TARGET_OPENCV_NAME} -Wno-switch-enum)
+        # Add depthai-core-opencv library and depthai::core::opencv alias
+        add_library(${TARGET_OPENCV_NAME} src/opencv/ImgFrame.cpp)
+        add_library("${PROJECT_NAME}::${TARGET_OPENCV_ALIAS}" ALIAS ${TARGET_OPENCV_NAME})
+        # Specifies name of generated IMPORTED target (set to alias)
+        set_target_properties(${TARGET_OPENCV_NAME} PROPERTIES EXPORT_NAME ${TARGET_OPENCV_ALIAS})
 
-# Link to OpenCV (publically)
-target_link_libraries(${TARGET_OPENCV_NAME} PUBLIC ${REQUIRED_OPENCV_LIBRARIES} ${THIRDPARTY_OPENCV_LIBRARIES})
+        # Add default flags
+        add_default_flags(${TARGET_OPENCV_NAME})
+        add_flag(${TARGET_OPENCV_NAME} -Wno-switch-enum)
 
-# Add public compile definition indicating that OpenCV support is available
-set(DEPTHAI_HAVE_OPENCV_SUPPORT ON)
+        # Link to OpenCV (publically)
+        target_link_libraries(${TARGET_OPENCV_NAME} PUBLIC ${REQUIRED_OPENCV_LIBRARIES} ${THIRDPARTY_OPENCV_LIBRARIES})
 
-# Specify that we are building target opencv
-target_compile_definitions(${TARGET_OPENCV_NAME} PUBLIC DEPTHAI_TARGET_OPENCV)
+        # Add public compile definition indicating that OpenCV support is available
+        set(DEPTHAI_HAVE_OPENCV_SUPPORT ON)
 
-# Add public dependency to depthai::core library
-target_link_libraries(${TARGET_OPENCV_NAME} PUBLIC ${TARGET_CORE_NAME})
+        # Specify that we are building target opencv
+        target_compile_definitions(${TARGET_OPENCV_NAME} PUBLIC DEPTHAI_TARGET_OPENCV)
 
-# Add to clangformat target
-if(COMMAND target_clangformat_setup)
-    target_clangformat_setup(${TARGET_OPENCV_NAME} "")
+        # Add public dependency to depthai::core library
+        target_link_libraries(${TARGET_OPENCV_NAME} PUBLIC ${TARGET_CORE_NAME})
+
+        # Add to clangformat target
+        if(COMMAND target_clangformat_setup)
+            target_clangformat_setup(${TARGET_OPENCV_NAME} "")
+        endif()
+
+        # Add to list of targets to export and install
+        list(APPEND targets_to_export ${TARGET_OPENCV_NAME})
+
+        message(STATUS "OpenCV and required libraries (${REQUIRED_OPENCV_LIBRARIES}) found. OpenCV Support enabled")
+
+    else()
+        message(STATUS "OpenCV or required libraries (${REQUIRED_OPENCV_LIBRARIES}) not found. OpenCV Support disabled")
+    endif()
 endif()
-
-# Add to list of targets to export and install
-list(APPEND targets_to_export ${TARGET_OPENCV_NAME})
-
-message(STATUS "OpenCV and required libraries (${REQUIRED_OPENCV_LIBRARIES}) found. OpenCV Support enabled")
 
 
 ########################
